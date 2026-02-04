@@ -358,9 +358,39 @@ If you use Algorithmic Indigo in academic work, please cite:
 - **The cyanotype community** for preserving this historic process
 - **Open-source contributors** to NumPy, OpenCV, and SciPy
 - **Early testers** who provided valuable feedback
-
 ---
+ 
+## **🖥️ Gradio Usage Guide**
 
+Algorithmic Indigo includes an optional Gradio web interface for interactive control of the cyanotype workflow.
+
+### **Launch the Interface**
+```bash
+python gradio_demo.py --model cyanotype_lut.csv --dpi 318
+```
+
+### **Interface Overview**
+- **Input Image**: Upload or drag-and-drop a source image.
+- **LUT Selector**: Choose your calibrated LUT file.
+- **DPI Setting**: Match your engraver's resolution.
+- **Size Control**: Specify physical dimensions (e.g., "60mm").
+- **Generate Laser Map**: Click to compute the optimized laser pattern.
+- **Export**: Download the resulting PNG for use in your engraver software.
+
+### **Advanced Options**
+- **Noise Level**: Adjust blue noise intensity for dithering.
+- **Spread Profile**: Customize diffusion based on material tests.
+- **Real-time Preview**: Toggle live visualization of the simulated output.
+
+### **Integration with Workflow**
+1. Generate a laser map using the Gradio interface.
+2. Save the output PNG.
+3. Load the PNG into your laser engraver software.
+4. Follow the standard printing procedure with -2mm focus offset.
+
+> **Tip**: The Gradio demo can be run on a remote server and accessed via a browser for collaborative testing.
+
+ 
 ## **❓ FAQ**
 
 ### **Q: Can I use a different laser engraver?**
