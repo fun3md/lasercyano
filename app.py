@@ -8,6 +8,7 @@ import io
 import pandas as pd
 import lasercyano_defaults as defaults
 from print_simulation import apply_print_simulation_alt
+from dotgain_cal import analyze_geometric_grid_v2, generate_calchart_target, refine_calibration_curve
 from dither_image import apply_cyanotype_correction, dither_image
 from laser_settings import get_spot_size, get_optimal_interval, get_dpi, get_power_scaling, check_pwm_overlap
 
@@ -22,7 +23,7 @@ def dot_gain_interface():
         with gr.Row():
             image_input = gr.File(label="Input Image", type="filepath")
             kernel_input = gr.TextArea(label="Kernel File", type="text", value=defaults.kernel_file)
-            lut_input = gr.TextArea(label="LUT CSV", type="text", value=defaults.lut_file)
+            lut_input = gr.TextArea(label="LUT CSV", type="text", value=defaults.lut_file) 
             
             with gr.Column():
                 source_dpi = gr.Slider(600, 1200, value=defaults.kernel_source_dpi, label="Source DPI")
@@ -41,6 +42,26 @@ def dot_gain_interface():
                     inputs=[image_input, kernel_input, lut_input, source_dpi, target_dpi, target_gamma, strength],
                     outputs=output_image
                 )
+                
+                # Additional Analyze Grid button
+                analyze_btn = gr.Button("Analyze Grid")
+                analyze_output = gr.Image(label="Analysis Output")
+                
+                analyze_btn.click(
+                    fn=lambda img_path: refine_calibration_curve(img_path)[1],
+                    inputs=image_input,
+                    outputs=analyze_output
+                )
+                
+                # Additional Generate Target button
+                target_btn = gr.Button("Generate Calibration Target")
+                target_output = gr.Image(label="Target Output")
+                
+                target_btn.click(
+                    fn=lambda: generate_calchart_target(),
+                    inputs=None,
+                    outputs=target_output
+                )
         return gr.Tab("Dot Gain Calibration")
 
 def print_simulation_interface():
@@ -54,6 +75,7 @@ def print_simulation_interface():
                 percentile = gr.Slider(1, 99, value=defaults.percentile, label="Percentile")
                 pre_adj_strength = gr.Slider(0.0, 1.0, value=defaults.pre_adj_strength, label="Pre-Adjust Strength")
                 pre_gamma = gr.Slider(1.0, 3.0, value=defaults.pre_gamma, label="Pre-Gamma")
+                power_levels_input = gr.Textbox(lines=1, placeholder="Enter power levels as comma-separated values (e.g., 0.0,0,0,1.0)", value="0.0,0,0,1.0", label="Power Levels")
             with gr.Column():
                     output_image = gr.Image(label="Dithered Print")
             with gr.Column():
@@ -66,9 +88,10 @@ def print_simulation_interface():
                 lut_input = gr.TextArea(label="LUT CSV", type="text", value=defaults.lut_file)
                 blue_noise_input = gr.TextArea(label="Blue Noise Kernel", type="text", value=defaults.BLUE_NOISE_PATH)
                 process_sim_btn.click(
-                    fn=lambda img_path, kernel_path, lut_path, source_dpi, target_dpi: 
-                        apply_print_simulation_alt(img_path, kernel_path, lut_path, source_dpi, target_dpi),
-                    inputs=[image_input, kernel_input, lut_input, source_dpi, target_dpi],
+                    fn=lambda img_path, kernel_path, lut_path, source_dpi, target_dpi, percentile, pre_adj_strength, pre_gamma, blue_noise_path, target_longest_edge:
+                        print_simulation_process(img_path, kernel_path, lut_path, source_dpi, target_dpi, percentile, pre_adj_strength, pre_gamma, blue_noise_path, target_longest_edge),
+                    inputs=[image_input, kernel_input, lut_input, source_dpi, target_dpi, 
+                           percentile, pre_adj_strength, pre_gamma, blue_noise_input, target_longest_edge],
                     outputs=output_image
                 )
                 process_dit_btn.click(
@@ -82,12 +105,14 @@ def print_simulation_interface():
                            percentile, pre_adj_strength, pre_gamma, blue_noise_input, target_longest_edge],
                     outputs=output_image
                 )
-                
-                
-                
-                
-                
-        return gr.Tab("Image Dither & Print Simulation")
+    return gr.Tab("Image Dither & Print Simulation")
+    
+def print_simulation_process(img_path, kernel_path, lut_path, source_dpi, target_dpi, percentile, pre_adj_strength, pre_gamma, blue_noise_path, target_longest_edge):
+    output_image = dither_image(img_path, kernel_path, lut_path, source_dpi, target_dpi, percentile, pre_adj_strength, pre_gamma, blue_noise_path, target_longest_edge)
+    output_image.save("scratch/out_dithered.png")
+    out_img_path = "scratch/out_dithered.png"
+    sim_rgb = apply_print_simulation_alt(out_img_path, kernel_path, lut_path, source_dpi, target_dpi),
+    return sim_rgb[0]
 
 def laser_settings_interface():
     """Create Gradio interface for laser settings helper."""
@@ -102,7 +127,7 @@ def laser_settings_interface():
         with gr.Column():
             base_spot_0mm = gr.Slider(0.05, 0.5, value=defaults.base_spot_0mm, label="Base Spot at 0mm")
             base_spot_2mm = gr.Slider(0.05, 0.5, value=defaults.base_spot_2mm, label="Base Spot at -2mm")
-            max_scale = gr.Slider(100, 1000, value=defaults.max_scale, label="Max Scale (1000 or 255)")
+            max_scale = gr.Slider(0, 4000, value=defaults.max_scale, label="Max Scale (1000 or 255)")
             ref_z = gr.Slider(-5, 5, value=defaults.ref_z, label="Reference Z (mm)")
             ref_power_min = gr.Slider(1, 100, value=defaults.ref_power_min, label="Ref Power Min")
             ref_power_max = gr.Slider(20, 4000, value=defaults.ref_power_max, label="Ref Power Max")

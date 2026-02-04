@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from PIL import Image
 import lasercyano_defaults
 
 def generate_paper_texture(shape, scale=0.5, intensity=0.05):
@@ -101,9 +102,11 @@ def apply_print_simulation_alt(image_path, kernel_path, lut_csv_path, source_dpi
     print(f"Top-Left Pixel Digital Value: {img[0,0]}")
     print(f"Top-Left Pixel Ink Density: {ink_density[0,0]:.4f}")
 
-    sim_rgb = cv2.resize(sim_rgb,(int(round(img.shape[1])), int(round(img.shape[0]))), interpolation=cv2.INTER_AREA)
-   
-    return img,np.clip(sim_rgb, 0, 255).astype(np.uint8), lut_map
+    sim_rgb = cv2.resize(sim_rgb, (int(round(img.shape[1])), int(round(img.shape[0]))), interpolation=cv2.INTER_AREA)
+    sim_rgb = cv2.normalize(sim_rgb, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    sim_rgb = cv2.cvtColor(sim_rgb, cv2.COLOR_BGR2RGB)
+    sim_out = Image.fromarray(sim_rgb.astype(np.uint8))
+    return sim_out
 
 
 

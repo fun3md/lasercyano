@@ -168,7 +168,7 @@ def create_res_block_h(h, w):
             block[start_y + y : start_y + y + spacing, :] = 0
     return block
 
-def generate_calchart_target(DPI=318, MAX_POWER_STEPS=80, PATCH_SIZE=10, GAP_SIZE=2, COLUMNS=9):
+def generate_calchart_target(DPI=lasercyano_defaults.DPI, MAX_POWER_STEPS=lasercyano_defaults.MAX_STEPS, PATCH_SIZE=lasercyano_defaults.PATCH_SIZE_MM, GAP_SIZE=lasercyano_defaults.GAP_MM, COLUMNS=lasercyano_defaults.COLUMNS):
     # 1. CORE CONTENT GENERATION
     GRID_WIDTH = (COLUMNS * PATCH_SIZE) + ((COLUMNS - 1) * GAP_SIZE)
 
@@ -352,8 +352,8 @@ COLS, ROWS = 9, 9
 # Higher (e.g., 500-1000) = very smooth line.
 SMOOTHING_FACTOR = 5000
 
-def analyze_geometric_grid_v2(image_path):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+def analyze_geometric_grid_v2(img):
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     if img is None: raise FileNotFoundError("analysis_ready.png not found.")
     
     im_h, im_w = img.shape
@@ -403,88 +403,67 @@ def analyze_geometric_grid_v2(image_path):
 
     return pd.DataFrame(results), viz
 
-# --- EXECUTE ---
-df, viz_img = analyze_geometric_grid_v2("analysis_ready.png")
-# --- 1. EXTRACT STEP 0 ---
-df_step_0 = df[df['step'] == 0].copy()
+def refine_calibration_curve(image_path):
+    # --- 1. LOAD AND PROCESS SCAN ---
+    warped_img, debug_img = process_scan_v7(image_path, out_w=600, out_h=800)
+    if warped_img is None:
+        print("Failed to process scan for calibration.")
+        return
 
-# --- 2. FILTER RANGE 55-80 ---
-df_range = df[(df['step'] >= 55) & (df['step'] <= 80)].copy()
+    # --- EXECUTE ---
+    df, viz_img = analyze_geometric_grid_v2(warped_img)
+    # --- 1. EXTRACT STEP 0 ---
+    df_step_0 = df[df['step'] == 0].copy()
 
-# --- 3. QUANTIZE THE RANGE (Pick 9 steps from the range) ---
-# We pick 9 steps here so that Step 0 + 9 steps = 10 steps total
-indices = np.linspace(0, len(df_range) - 1, 9).astype(int)
-df_sampled_range = df_range.iloc[indices]
+    # --- 2. FILTER RANGE 55-80 ---
+    df_range = df[(df['step'] >= 55) & (df['step'] <= 80)].copy()
 
-# --- 4. COMBINE ---
-df = pd.concat([df_step_0, df_sampled_range]).drop_duplicates().reset_index(drop=True)
+    # --- 3. QUANTIZE THE RANGE (Pick 9 steps from the range) ---
+    # We pick 9 steps here so that Step 0 + 9 steps = 10 steps total
+    indices = np.linspace(0, len(df_range) - 1, 9).astype(int)
+    df_sampled_range = df_range.iloc[indices]
 
-# Verify we have Step 0 and Step 80
-print("Final selected steps:", df['step'].tolist())
+    # --- 4. COMBINE ---
+    df = pd.concat([df_step_0, df_sampled_range]).drop_duplicates().reset_index(drop=True)
 
-# --- 3. NORMALIZATION (on the quantized data) ---
-r_min, r_max = df['measured_raw'].min(), df['measured_raw'].max()
-df['normalized'] = 255 * (df['measured_raw'] - r_min) / (r_max - r_min)
+    # Verify we have Step 0 and Step 80
+    print("Final selected steps:", df['step'].tolist())
 
-# Use this df_quantized for the spline and CSV
-df = df.sort_values(by='input_255')
+    # --- 3. NORMALIZATION (on the quantized data) ---
+    r_min, r_max = df['measured_raw'].min(), df['measured_raw'].max()
+    df['normalized'] = 255 * (df['measured_raw'] - r_min) / (r_max - r_min)
+
+    # Use this df_quantized for the spline and CSV
+    df = df.sort_values(by='input_255')
 
 
-# 2. Sorting (CRITICAL for Spline Interpolation)
-# We must sort by the X-axis (input power) or the math breaks
-df = df.sort_values(by='input_255')
+    # 2. Sorting (CRITICAL for Spline Interpolation)
+    # We must sort by the X-axis (input power) or the math breaks
+    df = df.sort_values(by='input_255')
 
-# 3. Smoothing / Interpolation
-x_data = df['input_255'].values
-y_data = df['normalized'].values
+    # 3. Smoothing / Interpolation
+    x_data = df['input_255'].values
+    y_data = df['normalized'].values
 
-# Create the spline function
-# s=SMOOTHING_FACTOR: Adjust this if the curve is too loose or too tight
-spline_func = UnivariateSpline(x_data, y_data, s=SMOOTHING_FACTOR)
+    # Create the spline function
+    # s=SMOOTHING_FACTOR: Adjust this if the curve is too loose or too tight
+    spline_func = UnivariateSpline(x_data, y_data, s=SMOOTHING_FACTOR)
 
-# Generate a clean 0-255 range (Lookup Table)
-x_lut = np.arange(0, 255)
-y_smooth = spline_func(x_lut)
+    # Generate a clean 0-255 range (Lookup Table)
+    x_lut = np.arange(0, 255)
+    y_smooth = spline_func(x_lut)
 
-# Clip values to ensure they stay within 0-255 (splines can overshoot slightly)
-y_smooth = np.clip(y_smooth, 0, 255)
+    # Clip values to ensure they stay within 0-255 (splines can overshoot slightly)
+    y_smooth = np.clip(y_smooth, 0, 255)
 
-# Create a new DataFrame for the smooth LUT
-df_lut = pd.DataFrame({
-    'input_255': x_data,
-    'normalized': y_data
-})
+    # Create a new DataFrame for the smooth LUT
+    df_lut = pd.DataFrame({
+        'input_255': x_data,
+        'normalized': y_data
+    })
 
-# --- PLOTTING ---
-plt.figure(figsize=(12, 6))
+    # --- EXPORT ---
+    # We now save the SMOOTHED full range (0-255) instead of the jagged points.
+    # This makes dither_v2.py much more accurate.
+    return df_lut
 
-# Left: Visual Grid
-plt.subplot(1, 2, 1)
-plt.imshow(viz_img)
-plt.title(f"Sampling Grid")
-plt.axis('off')
-
-# Right: Curve Comparison
-plt.subplot(1, 2, 2)
-# Plot original noisy points
-plt.plot(df['input_255'], df['normalized'], 'ro', markersize=4, alpha=0.4, label='Measured (Noisy)')
-# Plot smoothed curve
-plt.plot(df_lut['input_255'], df_lut['normalized'], 'b-', linewidth=2, label='Smoothed Spline')
-
-plt.plot([0, 255], [0, 255], 'k--', alpha=0.3)
-plt.xlabel("Digital Input (Power)")
-plt.ylabel("Normalized Density")
-plt.legend()
-plt.grid(True, alpha=0.5)
-plt.title("Calibration Curve")
-plt.tight_layout()
-plt.show()
-
-# --- EXPORT ---
-# We now save the SMOOTHED full range (0-255) instead of the jagged points.
-# This makes dither_v2.py much more accurate.
-df_lut.to_csv("cyanotype_lut.csv", index=False)
-print("Calibration refined, smoothed, and saved to cyanotype_lut.csv")
-
-df.to_csv("cyanotype_analysis.csv", index=True)
-cv2.imwrite("viz_img.png", viz_img)
