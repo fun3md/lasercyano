@@ -8,8 +8,8 @@ import io
 import pandas as pd
 import lasercyano_defaults as defaults
 from print_simulation import apply_print_simulation_alt
-from dotgain_cal import analyze_geometric_grid_v2, generate_calchart_target, refine_calibration_curve
-from dither_image import apply_cyanotype_correction, dither_image
+from dotgain_cal import generate_calchart_target, refine_calibration_curve
+from dither_image import dither_image
 from laser_settings import get_spot_size, get_optimal_interval, get_dpi, get_power_scaling, check_pwm_overlap
 
 
@@ -75,9 +75,10 @@ def print_simulation_interface():
                 percentile = gr.Slider(1, 99, value=defaults.percentile, label="Percentile")
                 pre_adj_strength = gr.Slider(0.0, 1.0, value=defaults.pre_adj_strength, label="Pre-Adjust Strength")
                 pre_gamma = gr.Slider(1.0, 3.0, value=defaults.pre_gamma, label="Pre-Gamma")
-                power_levels_input = gr.Textbox(lines=1, placeholder="Enter power levels as comma-separated values (e.g., 0.0,0,0,1.0)", value="0.0,0,0,1.0", label="Power Levels")
+                power_levels_input = gr.Textbox(lines=1, placeholder="Enter power levels as comma-separated values (e.g., 0.0,0,0,1.0)", value="0.0,0,0,1.0", label="Power Levels (1.0 = 100% of your max laser power)")
             with gr.Column():
-                    output_image = gr.Image(label="Dithered Print")
+                     output_image = gr.Image(label="Dithered Print")
+                     download_btn = gr.DownloadButton(label="Download Dithered Image", value="scratch/out_dithered.png")
             with gr.Column():
                 process_dit_btn = gr.Button("Dither Image")
                 

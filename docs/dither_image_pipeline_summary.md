@@ -157,4 +157,34 @@ cv2.imwrite('corrected_pre_dither.png', corrected)
 
 ---
 
-**End of Summary**  
+## Print Process Example
+Reference the naming used in the Gradio app 'app.py' (e.g., `print_simulation_process`, `dither_image`, `apply_print_simulation_alt`, `scratch/out_dithered.png`, `M3 (Static Power)`).
+
+**Print Process Overview**
+1. **Physical Calibration** – Determine Z‑Offset (-1.0 mm) and power limits (S‑Min, S‑Max) using LaserGRBL test charts.
+2. **Digital Preparation** – Load the image into `dither_image.ipynb`, apply blue‑noise dithering, and use the correction LUT and kernel generated in Phase 1.
+3. **Laser Settings** – Map grayscale values to the calibrated power range (S‑Min to S‑Max) and set feed rate to 3500 mm/min with a line interval of 0.065 mm.
+4. **Print Execution** – Use `M3 (Static Power)` in LaserGRBL to avoid banding; the process calls `print_simulation_process` which saves the result to `scratch/out_dithered.png`.
+5. **Post‑Processing** – Rinse, oxidize, and dry the printed sheet.
+
+**Naming Conventions**
+- `print_simulation_process`: entry point that orchestrates dithering and simulation.
+- `dither_image`: core function that produces the final bitmap.
+- `apply_print_simulation_alt`: adds print‑simulation visualisation.
+- `scratch/out_dithered.png`: output file path used by the Gradio interface.
+- `M3 (Static Power)`: recommended laser mode to prevent banding.
+
+> *Example usage in `app.py`*:
+> ```python
+> # Inside print_simulation_interface()
+> process_sim_btn.click(
+>     fn=lambda img_path, ...: print_simulation_process(...),
+>     inputs=[...],
+>     outputs=output_image
+> )
+> ```
+>
+> This example demonstrates how the print pipeline is exposed through the Gradio UI, using the same function names and file paths referenced in the documentation.
+ 
+ 
+**End of Summary**
