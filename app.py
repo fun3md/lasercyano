@@ -72,9 +72,9 @@ def print_simulation_interface():
                 source_dpi = gr.Slider(600, 1200, value=defaults.kernel_source_dpi, label="Source DPI")
                 target_dpi = gr.Slider(150, 600, value=defaults.target_image_dpi, label="Target DPI")
                 target_longest_edge = gr.Slider(50, 500, value=defaults.TARGET_LONGEST_EDGE_MM, label="Target Longest Edge (mm)")
-                percentile = gr.Slider(1, 99, value=defaults.percentile, label="Percentile")
+                percentile = gr.Slider(1, 99, value=defaults.percentile, label="White Clamp Percentile")
                 pre_adj_strength = gr.Slider(0.0, 1.0, value=defaults.pre_adj_strength, label="Pre-Adjust Strength")
-                pre_gamma = gr.Slider(1.0, 3.0, value=defaults.pre_gamma, label="Pre-Gamma")
+                pre_gamma = gr.Slider(0.0, 3.0, value=defaults.pre_gamma, label="Pre-Gamma")
                 power_levels_input = gr.Textbox(lines=1, placeholder="Enter power levels as comma-separated values (e.g., 0.0,0,0,1.0)", value="0.0,0,0,1.0", label="Power Levels (1.0 = 100% of your max laser power)")
             with gr.Column():
                      output_image = gr.Image(label="Dithered Print")
@@ -85,9 +85,9 @@ def print_simulation_interface():
                 process_sim_btn = gr.Button("Simulate Image")
                 
                 image_input = gr.File(label="Input Image", type="filepath")
-                kernel_input = gr.TextArea(label="Kernel File", type="text", value=defaults.kernel_file)
-                lut_input = gr.TextArea(label="LUT CSV", type="text", value=defaults.lut_file)
-                blue_noise_input = gr.TextArea(label="Blue Noise Kernel", type="text", value=defaults.BLUE_NOISE_PATH)
+                kernel_input = gr.Textbox(label="Kernel File", type="text", value=defaults.kernel_file)
+                lut_input = gr.Textbox(label="LUT CSV", type="text", value=defaults.lut_file)
+                blue_noise_input = gr.Textbox(label="Blue Noise Kernel", type="text", value=defaults.BLUE_NOISE_PATH)
                 process_sim_btn.click(
                     fn=lambda img_path, kernel_path, lut_path, source_dpi, target_dpi, percentile, pre_adj_strength, pre_gamma, blue_noise_path, target_longest_edge:
                         print_simulation_process(img_path, kernel_path, lut_path, source_dpi, target_dpi, percentile, pre_adj_strength, pre_gamma, blue_noise_path, target_longest_edge),
